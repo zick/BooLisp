@@ -55,6 +55,17 @@ class Subr:
   def ToString():
     return "<subr>"
 
+class Expr:
+  public args as object
+  public body as object
+  public env as object
+  def constructor(a, b, e):
+    args = a
+    body = b
+    env = e
+  def ToString():
+    return "<epxr>"
+
 class ParseState:
   public elm as object
   public next as string
@@ -77,6 +88,9 @@ def toCons(obj):
 def toSubr(obj):
   ret = obj cast Subr
   return ret
+def toExpr(obj):
+  ret = obj cast Expr
+  return ret
 
 kLPar = char('(')
 kRPar = char(')')
@@ -93,6 +107,7 @@ def makeSym(s as string):
 sym_t = makeSym('t')
 sym_quote = makeSym('quote')
 sym_if = makeSym('if')
+sym_lambda = makeSym('lambda')
 
 def safeCar(obj as object):
   if obj.GetType() == Cons:
@@ -104,6 +119,9 @@ def safeCdr(obj as object):
     return toCons(obj).cdr
   return kNil
 
+def makeExpr(args, env):
+  return Expr(safeCar(args), safeCdr(args), env)
+
 def nreverse(lst as object):
   ret as object = kNil
   while lst.GetType() == Cons:
@@ -113,6 +131,16 @@ def nreverse(lst as object):
     ret = lst
     lst = tmp
   return ret
+
+def pairlis(lst1 as object, lst2 as object):
+  ret as object = kNil
+  while lst1.GetType() == Cons and lst2.GetType() == Cons:
+    cell1 = toCons(lst1)
+    cell2 = toCons(lst2)
+    ret = Cons(Cons(cell1.car, cell2.car), ret)
+    lst1 = cell1.cdr
+    lst2 = cell2.cdr
+  return nreverse(ret)
 
 def isSpace(c as char):
   return c == char('\t') or c == char('\r') or c == char('\n') or c == char(' ')
@@ -219,6 +247,8 @@ def eval(obj as object, env as object) as object:
       return eval(safeCar(safeCdr(safeCdr(args))), env)
     else:
       return eval(safeCar(safeCdr(args)), env)
+  elif op == sym_lambda:
+    return makeExpr(args, env)
 
   // evlis
   aargs as object = kNil
@@ -243,6 +273,17 @@ def eval(obj as object, env as object) as object:
     return aargs
   elif type == Subr:
     return subrCall(toSubr(fn).data, aargs)
+  elif type == Expr:
+    // progn
+    ret as object = kNil
+    expr = toExpr(fn)
+    body as object = expr.body
+    env = Cons(pairlis(expr.args, aargs), expr.env)
+    while body.GetType() == Cons:
+      cell = toCons(body)
+      ret = eval(cell.car, env)
+      body = cell.cdr
+    return ret
   else:
     return Error(fn.ToString() + ' is not function')
 
