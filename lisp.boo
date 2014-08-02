@@ -23,7 +23,7 @@ class Error:
   def constructor(s as string):
     data = s
   def ToString():
-    return data
+    return '<error: ' + data + '>'
 
 class Cons:
   public car as object
@@ -48,14 +48,19 @@ class Cons:
     else:
       return '(' + ret + ' . ' + obj.ToString() + ')'
 
+class Subr:
+  public data as int
+  def constructor(n as int):
+    data = n
+  def ToString():
+    return "<subr>"
+
 class ParseState:
   public elm as object
   public next as string
   def constructor(o, s):
     elm = o
     next = s
-
-callable Printer(obj as object) as string
 
 def toNum(obj):
   ret = obj cast Num
@@ -68,6 +73,9 @@ def toError(obj):
   return ret
 def toCons(obj):
   ret = obj cast Cons
+  return ret
+def toSubr(obj):
+  ret = obj cast Subr
   return ret
 
 kLPar = char('(')
@@ -84,6 +92,7 @@ def makeSym(s as string):
 
 sym_t = makeSym('t')
 sym_quote = makeSym('quote')
+sym_if = makeSym('if')
 
 def safeCar(obj as object):
   if obj.GetType() == Cons:
@@ -176,9 +185,19 @@ def findVar(sym, env as object):
 g_env = Cons(kNil, kNil)
 
 def addToEnv(sym, val, env as object):
-  toCons(env).car = Cons(Cons(sym, val), toCons(env).cdr)
+  toCons(env).car = Cons(Cons(sym, val), toCons(env).car)
 
-def eval(obj as object, env):
+def subrCall(id, args):
+  if id == 0:
+    return safeCar(safeCar(args))
+  elif id == 1:
+    return safeCdr(safeCar(args))
+  elif id == 2:
+    return Cons(safeCar(args), safeCar(safeCdr(args)))
+  else:
+    return Error('unknown subr')
+
+def eval(obj as object, env as object) as object:
   type = obj.GetType()
   if type == Nil or type == Num or type == Error:
     return obj
@@ -188,9 +207,49 @@ def eval(obj as object, env):
       return Error(toSym(obj).data + ' has no value')
     else:
       return toCons(bind).cdr
-  return Error('noimpl')
+  op = safeCar(obj)
+  args = safeCdr(obj)
+  if op == sym_quote:
+    return safeCar(args)
+  elif op == sym_if:
+    c = eval(safeCar(args), env)
+    if c.GetType() == Error:
+      return c
+    elif c == kNil:
+      return eval(safeCar(safeCdr(safeCdr(args))), env)
+    else:
+      return eval(safeCar(safeCdr(args)), env)
+
+  // evlis
+  aargs as object = kNil
+  lst as object = args
+  while lst.GetType() == Cons:
+    cell = toCons(lst)
+    elm = eval(cell.car, env)
+    if elm.GetType() == Error:
+      aargs = elm
+      break
+    aargs = Cons(elm, aargs)
+    lst = cell.cdr
+  if aargs.GetType() != Error:
+    aargs = nreverse(aargs)
+
+  // apply
+  fn = eval(op, env)
+  type = fn.GetType()
+  if type == Error:
+    return fn
+  elif aargs.GetType() == Error:
+    return aargs
+  elif type == Subr:
+    return subrCall(toSubr(fn).data, aargs)
+  else:
+    return Error(fn.ToString() + ' is not function')
 
 addToEnv(sym_t, sym_t, g_env)
+addToEnv(makeSym('car'), Subr(0), g_env)
+addToEnv(makeSym('cdr'), Subr(1), g_env)
+addToEnv(makeSym('cons'), Subr(2), g_env)
 
 while true:
   System.Console.Write('> ')
