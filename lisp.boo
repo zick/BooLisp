@@ -53,7 +53,7 @@ class Subr:
   def constructor(n as int):
     data = n
   def ToString():
-    return "<subr>"
+    return '<subr>'
 
 class Expr:
   public args as object
@@ -64,7 +64,7 @@ class Expr:
     body = b
     env = e
   def ToString():
-    return "<epxr>"
+    return '<epxr>'
 
 class ParseState:
   public elm as object
@@ -217,15 +217,64 @@ g_env = Cons(kNil, kNil)
 def addToEnv(sym, val, env as object):
   toCons(env).car = Cons(Cons(sym, val), toCons(env).car)
 
-def subrCall(id, args):
+def subrEq(args):
+  x = safeCar(args)
+  y = safeCar(safeCdr(args))
+  if x.GetType() == Num and y.GetType() == Num:
+    if toNum(x).data == toNum(y).data:
+      return sym_t
+    else:
+      return kNil
+  elif x == y:
+    return sym_t
+  return kNil
+
+def arithCall(id as int, args):
+  x = safeCar(args)
+  y = safeCar(safeCdr(args))
+  if x.GetType() != Num or y.GetType() != Num:
+    return Error('wrong type')
+  n = toNum(x).data
+  m = toNum(y).data
+  if id == 0:
+    return Num(n + m)
+  elif id == 1:
+    return Num(n * m)
+  elif id == 2:
+    return Num(n - m)
+  elif id == 3:
+    return Num(n / m)
+  elif id == 4:
+    return Num(n % m)
+  else:
+    return Error('unknown subr')
+
+def subrCall(id as int, args):
   if id == 0:
     return safeCar(safeCar(args))
   elif id == 1:
     return safeCdr(safeCar(args))
   elif id == 2:
     return Cons(safeCar(args), safeCar(safeCdr(args)))
+  elif id == 3:
+    return subrEq(args)
+  elif id == 4:
+    if safeCar(args).GetType() == Cons:
+      return kNil
+    else:
+      return sym_t
+  elif id == 5:
+    if safeCar(args).GetType() == Num:
+      return sym_t
+    else:
+      return kNil
+  elif id == 6:
+    if safeCar(args).GetType() == Sym:
+      return sym_t
+    else:
+      return kNil
   else:
-    return Error('unknown subr')
+    return arithCall(id - 7, args)
 
 def eval(obj as object, env as object) as object:
   type = obj.GetType()
@@ -307,6 +356,15 @@ addToEnv(sym_t, sym_t, g_env)
 addToEnv(makeSym('car'), Subr(0), g_env)
 addToEnv(makeSym('cdr'), Subr(1), g_env)
 addToEnv(makeSym('cons'), Subr(2), g_env)
+addToEnv(makeSym('eq'), Subr(3), g_env)
+addToEnv(makeSym('atom'), Subr(4), g_env)
+addToEnv(makeSym('numberp'), Subr(5), g_env)
+addToEnv(makeSym('symbolp'), Subr(6), g_env)
+addToEnv(makeSym('+'), Subr(7), g_env)
+addToEnv(makeSym('*'), Subr(8), g_env)
+addToEnv(makeSym('-'), Subr(9), g_env)
+addToEnv(makeSym('/'), Subr(10), g_env)
+addToEnv(makeSym('mod'), Subr(11), g_env)
 
 while true:
   System.Console.Write('> ')
