@@ -82,7 +82,18 @@ def makeSym(s as string):
     sym_table[s] = Sym(s)
   return sym_table[s]
 
+sym_t = makeSym('t')
 sym_quote = makeSym('quote')
+
+def safeCar(obj as object):
+  if obj.GetType() == Cons:
+    return toCons(obj).car
+  return kNil
+
+def safeCdr(obj as object):
+  if obj.GetType() == Cons:
+    return toCons(obj).cdr
+  return kNil
 
 def nreverse(lst as object):
   ret as object = kNil
@@ -151,9 +162,39 @@ def read(s as string) as ParseState:
   else:
     return readAtom(s)
 
+def findVar(sym, env as object):
+  while env.GetType() == Cons:
+    alist = safeCar(env)
+    while alist.GetType() == Cons:
+      cell = toCons(alist)
+      if safeCar(cell.car) == sym:
+        return cell.car
+      alist = cell.cdr
+    env = safeCdr(env)
+  return kNil
+
+g_env = Cons(kNil, kNil)
+
+def addToEnv(sym, val, env as object):
+  toCons(env).car = Cons(Cons(sym, val), toCons(env).cdr)
+
+def eval(obj as object, env):
+  type = obj.GetType()
+  if type == Nil or type == Num or type == Error:
+    return obj
+  elif type == Sym:
+    bind = findVar(obj, env)
+    if bind == kNil:
+      return Error(toSym(obj).data + ' has no value')
+    else:
+      return toCons(bind).cdr
+  return Error('noimpl')
+
+addToEnv(sym_t, sym_t, g_env)
+
 while true:
   System.Console.Write('> ')
   line = Console.ReadLine()
   if not line:
     break
-  print(read(line).elm.ToString())
+  print(eval(read(line).elm, g_env).ToString())
