@@ -108,6 +108,7 @@ sym_t = makeSym('t')
 sym_quote = makeSym('quote')
 sym_if = makeSym('if')
 sym_lambda = makeSym('lambda')
+sym_defun = makeSym('defun')
 
 def safeCar(obj as object):
   if obj.GetType() == Cons:
@@ -249,6 +250,11 @@ def eval(obj as object, env as object) as object:
       return eval(safeCar(safeCdr(args)), env)
   elif op == sym_lambda:
     return makeExpr(args, env)
+  elif op == sym_defun:
+    expr = makeExpr(safeCdr(args), env)
+    sym = safeCar(args)
+    addToEnv(sym, expr, g_env)
+    return sym
 
   // evlis
   aargs as object = kNil
